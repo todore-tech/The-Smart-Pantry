@@ -316,12 +316,12 @@
         };
 
         const executeAIScan = async (base64) => {
-            const ai = new GoogleGenAI({ apiKey: AIzaSyDhfLiJawI3ARUNrP0nd1amDABaVgeVX3o });
+            const ai = new GoogleGenAI({ apiKey: "AIzaSyDhfLiJawI3ARUNrP0nd1amDABaVgeVX3o" });
             const targetLang = state.lang === 'he' ? 'Hebrew' : 'English';
             
             try {
                 const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
+                    model: 'gemini-1.5-flash',
                     contents: { 
                         parts: [
                             processImageForAI(base64),
