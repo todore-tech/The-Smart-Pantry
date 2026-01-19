@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Recipe, Order, Language, Ingredient, Unit } from './types';
-import { TRANSLATIONS, CATEGORY_OPTIONS } from './constants';
+import { Recipe, Order, Language, Ingredient, Unit } from './types.ts';
+import { TRANSLATIONS, CATEGORY_OPTIONS } from './constants.tsx';
 import { 
   BookOpen, 
   ShoppingCart, 
@@ -16,9 +16,6 @@ import {
   MessageCircle,
   Calculator,
   Image as ImageIcon,
-  Camera,
-  ArrowDownAZ,
-  AlertTriangle,
   Search,
   Sparkles,
   Loader2,
@@ -318,13 +315,32 @@ const RecipeModal: React.FC<{
 const App: React.FC = () => {
   // Safe functional initializers for state
   const [lang, setLang] = useState<Language>(() => {
-    try { return (localStorage.getItem('smart_pantry_lang') as Language) || 'en'; } catch { return 'en'; }
+    try {
+      const saved = localStorage.getItem('smart_pantry_lang');
+      return (saved === 'en' || saved === 'he') ? saved : 'en';
+    } catch {
+      return 'en';
+    }
   });
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
-    try { return JSON.parse(localStorage.getItem('smart_pantry_recipes') || '[]'); } catch { return []; }
+    try {
+      const saved = localStorage.getItem('smart_pantry_recipes');
+      if (!saved || saved === 'null' || saved === 'undefined') return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
   const [orders, setOrders] = useState<Order>(() => {
-    try { return JSON.parse(localStorage.getItem('smart_pantry_orders') || '{}'); } catch { return {}; }
+    try {
+      const saved = localStorage.getItem('smart_pantry_orders');
+      if (!saved || saved === 'null' || saved === 'undefined') return {};
+      const parsed = JSON.parse(saved);
+      return (parsed && typeof parsed === 'object') ? parsed : {};
+    } catch {
+      return {};
+    }
   });
 
   const [activeTab, setActiveTab] = useState('recipes');
@@ -333,34 +349,44 @@ const App: React.FC = () => {
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
 
-  const t = TRANSLATIONS[lang];
+  // Ensure currentLang is always valid
+  const currentLang: Language = (lang === 'he') ? 'he' : 'en';
+  const t = TRANSLATIONS[currentLang];
 
   // Persist data
   useEffect(() => {
-    localStorage.setItem('smart_pantry_recipes', JSON.stringify(recipes));
-    localStorage.setItem('smart_pantry_orders', JSON.stringify(orders));
-    localStorage.setItem('smart_pantry_lang', lang);
+    try {
+      localStorage.setItem('smart_pantry_recipes', JSON.stringify(recipes));
+      localStorage.setItem('smart_pantry_orders', JSON.stringify(orders));
+      localStorage.setItem('smart_pantry_lang', lang);
+    } catch (e) {
+      console.warn("Storage error:", e);
+    }
     document.body.dir = lang === 'he' ? 'rtl' : 'ltr';
   }, [recipes, orders, lang]);
 
   const filteredRecipes = useMemo(() => {
-    return recipes.filter(r => r.name.toLowerCase().includes(recipeSearch.toLowerCase()));
+    const list = Array.isArray(recipes) ? recipes : [];
+    return list.filter(r => r && r.name && r.name.toLowerCase().includes(recipeSearch.toLowerCase()));
   }, [recipes, recipeSearch]);
 
   const shoppingList = useMemo(() => {
     const totals: Record<string, { name: string; quantity: number; unit: Unit }> = {};
-    // Fix: Explicitly cast qty to number to solve 'unknown' comparison and arithmetic errors
-    Object.entries(orders).forEach(([id, qty]) => {
-      const numericQty = qty as number;
+    const safeOrders = orders && typeof orders === 'object' ? orders : {};
+    
+    Object.entries(safeOrders).forEach(([id, qty]) => {
+      const numericQty = Number(qty);
       if (numericQty <= 0) return;
-      const r = recipes.find(rcp => rcp.id === id);
-      if (!r) return;
+      const r = Array.isArray(recipes) ? recipes.find(rcp => rcp.id === id) : null;
+      if (!r || !Array.isArray(r.ingredients)) return;
+      
       r.ingredients.forEach(ing => {
+        if (!ing || !ing.name) return;
         const key = `${ing.name.toLowerCase().trim()}_${ing.unit}`;
         if (totals[key]) {
-          totals[key].quantity += ing.quantity * numericQty;
+          totals[key].quantity += (ing.quantity || 0) * numericQty;
         } else {
-          totals[key] = { ...ing, quantity: ing.quantity * numericQty };
+          totals[key] = { ...ing, quantity: (ing.quantity || 0) * numericQty };
         }
       });
     });
@@ -369,8 +395,9 @@ const App: React.FC = () => {
 
   const handleSave = (recipe: Recipe) => {
     setRecipes(prev => {
-      const exists = prev.some(r => r.id === recipe.id);
-      return exists ? prev.map(r => r.id === recipe.id ? recipe : r) : [...prev, recipe];
+      const list = Array.isArray(prev) ? prev : [];
+      const exists = list.some(r => r.id === recipe.id);
+      return exists ? list.map(r => r.id === recipe.id ? recipe : r) : [...list, recipe];
     });
     setIsModalOpen(false);
   };
@@ -408,16 +435,16 @@ const App: React.FC = () => {
               />
             </div>
 
-            {recipes.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-[2.5rem] border-2 border-dashed border-[#3D2B1F]/10 flex flex-col items-center gap-4 px-10">
+            {(!Array.isArray(recipes) || recipes.length === 0) ? (
+              <div className="text-center py-20 bg-white rounded-[2.5rem] border-2 border-dashed border-[#3D2B1F]/10 flex flex-col items-center gap-4 px-10 animate-fade-in">
                 <ChefHat size={64} className="text-[#FF8A3D]/20" />
                 <div className="space-y-2">
                   <p className="text-[#3D2B1F] font-bold text-lg">{lang === 'en' ? 'Welcome to Smart Pantry!' : 'ברוכים הבאים למזווה החכם!'}</p>
-                  <p className="text-[#3D2B1F]/40 font-medium">{t.emptyRecipes}</p>
+                  <p className="text-[#3D2B1F]/40 font-medium leading-relaxed">{t.emptyRecipes}</p>
                 </div>
                 <button 
                   onClick={() => { setEditingRecipe(null); setIsModalOpen(true); }}
-                  className="mt-4 bg-[#FF8A3D] text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-[#FF8A3D]/20 active:scale-95 transition-transform"
+                  className="mt-4 bg-[#FF8A3D] text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-[#FF8A3D]/20 active:scale-95 transition-transform"
                 >
                   {t.addRecipe}
                 </button>
@@ -451,7 +478,7 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold">{t.orders}</h2>
               <button onClick={() => setOrders({})} className="text-red-400 font-bold text-xs uppercase tracking-widest">{lang === 'en' ? 'Reset' : 'אפס'}</button>
             </div>
-            {recipes.length === 0 ? (
+            {(!Array.isArray(recipes) || recipes.length === 0) ? (
               <div className="text-center py-20 bg-white rounded-[2.5rem] border border-[#3D2B1F]/5 px-8">
                 <p className="text-[#3D2B1F]/40">{t.emptyRecipes}</p>
               </div>
@@ -464,9 +491,9 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex-1 min-w-0"><span className="font-bold block truncate">{r.name}</span></div>
                     <div className="flex items-center gap-3 bg-[#FEF9F3] p-1 rounded-2xl border border-[#3D2B1F]/5">
-                      <button onClick={() => setOrders(prev => ({ ...prev, [r.id]: Math.max(0, (prev[r.id] || 0) - 1) }))} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-[#3D2B1F]"><Minus size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setOrders(prev => ({ ...prev, [r.id]: Math.max(0, (Number(prev[r.id]) || 0) - 1) })); }} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg shadow-sm text-[#3D2B1F]"><Minus size={16} /></button>
                       <span className="w-4 text-center font-bold">{orders[r.id] || 0}</span>
-                      <button onClick={() => setOrders(prev => ({ ...prev, [r.id]: (prev[r.id] || 0) + 1 }))} className="w-8 h-8 flex items-center justify-center bg-[#FF8A3D] text-white rounded-lg shadow-sm"><Plus size={16} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setOrders(prev => ({ ...prev, [r.id]: (Number(prev[r.id]) || 0) + 1 })); }} className="w-8 h-8 flex items-center justify-center bg-[#FF8A3D] text-white rounded-lg shadow-sm"><Plus size={16} /></button>
                     </div>
                   </div>
                 ))}
