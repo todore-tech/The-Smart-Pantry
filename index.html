@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,42 +5,771 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Smart Pantry</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        :root {
+            --pantry-bg: #FEF9F3;
+            --pantry-brown: #3D2B1F;
+            --pantry-orange: #FF8A3D;
+            --pantry-orange-dark: #FF6B3D;
+        }
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #FEF9F3;
-            color: #3D2B1F;
+            background-color: var(--pantry-bg);
+            color: var(--pantry-brown);
             -webkit-tap-highlight-color: transparent;
             margin: 0;
             overflow-x: hidden;
         }
-        /* Hide scrollbar for Chrome, Safari and Opera */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
         @keyframes fade-in {
-            from { opacity: 0; transform: translateY(8px); }
+            from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+        .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        .active-tab-indicator {
+            background-color: rgba(255, 138, 61, 0.12);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+        }
+
+        #recipeModal {
+            transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(100%);
+            z-index: 100;
+        }
+        #recipeModal.open {
+            pointer-events: auto;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .ingredient-item {
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            box-shadow: 0 0 0 4px rgba(255, 138, 61, 0.1);
+            border-color: rgba(255, 138, 61, 0.3);
+        }
+
+        [dir="rtl"] .dir-helper { direction: rtl; text-align: right; }
+        [dir="ltr"] .dir-helper { direction: ltr; text-align: left; }
     </style>
-<script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0",
     "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.37.0"
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
-<body>
-    <div id="root"></div>
-    <!-- Entry point script -->
-    <script type="module" src="./index.tsx"></script>
+<body class="min-h-screen flex flex-col">
+    <div id="app" class="flex flex-col min-h-screen pb-32">
+        <!-- Header -->
+        <header class="sticky top-0 z-40 bg-[#FEF9F3]/90 backdrop-blur-xl px-6 py-4 flex justify-between items-center border-b border-[#3D2B1F]/5">
+            <h1 id="appTitle" class="text-xl font-black tracking-tight text-[#3D2B1F]">The Smart Pantry</h1>
+            <button id="langToggle" class="bg-white shadow-sm border border-[#3D2B1F]/10 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-bold active:scale-95 transition-transform">
+                <i data-lucide="globe" class="text-[#FF8A3D] w-4 h-4"></i>
+                <span id="langToggleLabel">🇮🇱 HE</span>
+            </button>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="mainContent" class="px-6 py-6 flex-1">
+            <!-- Dynamic Content -->
+        </main>
+
+        <!-- Fixed Calculate Button for Orders Tab -->
+        <div id="calculateBtnContainer" class="fixed bottom-[112px] left-6 right-6 z-40 hidden pointer-events-none">
+            <button id="calculateBtn" class="w-full bg-[#3D2B1F] text-white py-5 rounded-[2.25rem] font-black shadow-2xl flex items-center justify-center gap-3 active:scale-95 hover:bg-[#2D1B1F] transition-all pointer-events-auto">
+                <i data-lucide="calculator" class="text-[#FF8A3D] w-5 h-5"></i>
+                <span id="calculateBtnLabel">Calculate List</span>
+            </button>
+        </div>
+
+        <!-- Navigation Bar -->
+        <nav class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-2xl border-t border-[#3D2B1F]/5 pb-8 pt-5 px-6 flex justify-around items-center z-50 shadow-[0_-8px_30px_-10px_rgba(0,0,0,0.12)]">
+            <button id="nav-recipes" class="nav-btn flex flex-col items-center gap-2 transition-all active:scale-90 text-[#3D2B1F]/20 group">
+                <div class="nav-icon-bg p-3 rounded-2xl transition-all duration-300">
+                    <i data-lucide="book-open" class="w-6 h-6"></i>
+                </div>
+                <span class="nav-label text-[10px] font-black uppercase tracking-[0.15em] opacity-60">Recipes</span>
+            </button>
+            <button id="nav-orders" class="nav-btn flex flex-col items-center gap-2 transition-all active:scale-90 text-[#3D2B1F]/20 group">
+                <div class="nav-icon-bg p-3 rounded-2xl transition-all duration-300">
+                    <i data-lucide="list-checks" class="w-6 h-6"></i>
+                </div>
+                <span class="nav-label text-[10px] font-black uppercase tracking-[0.15em] opacity-60">Orders</span>
+            </button>
+            <button id="nav-shopping" class="nav-btn flex flex-col items-center gap-2 transition-all active:scale-90 text-[#3D2B1F]/20 group">
+                <div class="nav-icon-bg p-3 rounded-2xl transition-all duration-300">
+                    <i data-lucide="shopping-cart" class="w-6 h-6"></i>
+                </div>
+                <span class="nav-label text-[10px] font-black uppercase tracking-[0.15em] opacity-60">Shopping</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Full Screen Modal -->
+    <div id="recipeModal" class="fixed inset-0 bg-[#FEF9F3] overflow-hidden">
+        <!-- AI Loading Overlay -->
+        <div id="aiScanningOverlay" class="absolute inset-0 z-[110] bg-[#3D2B1F]/80 backdrop-blur-lg hidden flex-col items-center justify-center text-white p-6 text-center">
+            <div class="animate-spin mb-6 text-[#FF8A3D]">
+                <i data-lucide="loader-2" class="w-14 h-14"></i>
+            </div>
+            <p id="aiScanningText" class="text-2xl font-black mb-2">Analyzing...</p>
+            <p class="text-sm opacity-60 max-w-[240px]">Gemini AI is reading your recipe image and converting it to data.</p>
+        </div>
+        
+        <form id="recipeForm" class="flex flex-col h-full">
+            <header class="px-6 py-4 flex justify-between items-center bg-white border-b border-[#3D2B1F]/5">
+                <button id="closeModalBtn" type="button" class="p-2 active:scale-90 transition-transform"><i data-lucide="x" class="w-6 h-6"></i></button>
+                <h2 id="modalTitle" class="font-black text-lg">Add Recipe</h2>
+                <div class="flex gap-2">
+                    <button id="deleteRecipeBtn" type="button" class="text-red-500 p-2 hidden active:scale-90 transition-transform">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                    </button>
+                    <button type="submit" class="text-[#FF8A3D] font-black p-2 active:scale-95" id="saveBtnLabel">Save</button>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-6 space-y-8 pb-32">
+                <!-- AI Feature Box -->
+                <button id="aiScanBtn" type="button" class="w-full bg-gradient-to-br from-[#FF8A3D] to-[#FF6B3D] text-white py-5 rounded-[2rem] font-black shadow-xl flex items-center justify-center gap-3 active:scale-[0.98] transition-all">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                    <span id="aiScanBtnLabel">Smart AI Scan</span>
+                </button>
+                <input type="file" id="aiFileInput" accept="image/*" class="hidden" />
+
+                <!-- Image Section -->
+                <div class="space-y-4">
+                    <label id="recipeImageLabel" class="text-[10px] font-black uppercase text-[#3D2B1F]/40 tracking-widest px-1">Visual Reference</label>
+                    <div class="w-full h-72 bg-white rounded-[3rem] border-2 border-dashed border-[#3D2B1F]/10 flex flex-col items-center justify-center overflow-hidden group relative shadow-inner-lg">
+                        <img id="recipeImagePreview" src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1200" class="w-full h-full object-cover transition-all duration-1000 opacity-40 grayscale-[0.2]" />
+                        
+                        <div id="imagePlaceholder" class="absolute inset-0 flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform">
+                            <div class="bg-white/95 backdrop-blur-xl p-6 rounded-full shadow-2xl border border-white">
+                                <i data-lucide="camera" class="w-10 h-10 text-[#FF8A3D]"></i>
+                            </div>
+                            <span id="tapToUploadLabel" class="text-[10px] font-black uppercase mt-5 tracking-widest text-[#3D2B1F]/60">Upload Photo</span>
+                        </div>
+
+                        <button id="magicScanBtn" type="button" class="absolute bottom-6 right-6 bg-white/95 backdrop-blur-xl text-[#FF8A3D] p-5 rounded-3xl shadow-2xl border border-white hidden flex items-center gap-3 active:scale-90 transition-all">
+                            <i data-lucide="wand-2" class="w-6 h-6"></i>
+                            <span id="magicScanLabel" class="text-[11px] font-black uppercase tracking-wider">Magic Scan</span>
+                        </button>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/*" class="hidden" />
+                </div>
+
+                <!-- Basic Info -->
+                <div class="space-y-6">
+                    <div class="space-y-2">
+                        <label id="recipeNameLabel" class="text-[10px] font-black uppercase text-[#3D2B1F]/40 tracking-widest px-1">Name</label>
+                        <input type="text" id="recipeNameInput" required class="w-full bg-white rounded-2xl p-5 text-lg font-bold shadow-sm border border-transparent focus:border-[#FF8A3D]/20 outline-none transition-all" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label id="prepTimeLabel" class="text-[10px] font-black uppercase text-[#3D2B1F]/40 tracking-widest px-1">Prep</label>
+                            <input type="number" id="prepTimeInput" class="w-full bg-white rounded-2xl p-5 text-lg font-bold shadow-sm border border-transparent outline-none transition-all" />
+                        </div>
+                        <div class="space-y-2">
+                            <label id="cookTimeLabel" class="text-[10px] font-black uppercase text-[#3D2B1F]/40 tracking-widest px-1">Cook</label>
+                            <input type="number" id="cookTimeInput" class="w-full bg-white rounded-2xl p-5 text-lg font-bold shadow-sm border border-transparent outline-none transition-all" />
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label id="categoryLabel" class="text-[10px] font-black uppercase text-[#3D2B1F]/40 tracking-widest px-1">Category</label>
+                        <div id="categoryChips" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- Ingredients Section -->
+                <div class="space-y-5">
+                    <div class="flex justify-between items-center px-1">
+                        <h3 id="ingredientsSectionLabel" class="text-[10px] font-black uppercase text-[#3D2B1F]/40 tracking-widest">Ingredients</h3>
+                        <button id="addIngredientBtn" type="button" class="text-[#FF8A3D] font-black text-[10px] uppercase flex items-center gap-2 bg-[#FF8A3D]/10 px-4 py-2 rounded-full active:scale-95 transition-all">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span id="addIngredientBtnLabel">Add</span>
+                        </button>
+                    </div>
+                    <div id="ingredientsList" class="space-y-4"></div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script type="module">
+        import { GoogleGenAI, Type } from "@google/genai";
+
+        // --- Configuration & Translations ---
+        const TRANSLATIONS = {
+            en: {
+                title: 'The Smart Pantry',
+                recipes: 'Recipes',
+                orders: 'Orders',
+                shopping: 'Shopping',
+                addRecipe: 'Add Recipe',
+                recipeName: 'Recipe Name',
+                ingredientName: 'Ingredient Name',
+                quantity: 'Qty',
+                unit: 'Unit',
+                save: 'Save Recipe',
+                delete: 'Delete',
+                edit: 'Edit Recipe',
+                calculate: 'Sum Shopping List',
+                copyWhatsapp: 'WhatsApp',
+                emptyRecipes: 'No recipes yet. Start by adding one!',
+                emptyOrders: 'Select items from your pantry to generate a list.',
+                addIngredient: 'Add Item',
+                recipeImage: 'Recipe Visual',
+                tapToUpload: 'Upload Reference Photo',
+                sortIngredients: 'Alphabetical',
+                searchPlaceholder: 'Find a recipe...',
+                aiScan: 'AI Smart Scan',
+                aiScanning: 'Scanning...',
+                aiScanError: 'AI Scan failed. Check image quality.',
+                prepTime: 'Prep Time',
+                cookTime: 'Cook Time',
+                minutes: 'min',
+                magicScan: 'Magic Scan',
+                categories: { meat: 'Meat', dairy: 'Dairy', pareve: 'Pareve', dessert: 'Dessert', other: 'Other' },
+                units: { grams: 'g', kg: 'kg', units: 'units', liters: 'L', cans: 'cans', packs: 'packs' }
+            },
+            he: {
+                title: 'המזווה החכם',
+                recipes: 'מתכונים',
+                orders: 'הזמנות',
+                shopping: 'קניות',
+                addRecipe: 'מתכון חדש',
+                recipeName: 'שם המתכון',
+                ingredientName: 'שם המרכיב',
+                quantity: 'כמות',
+                unit: 'יחידה',
+                save: 'שמור מתכון',
+                delete: 'מחק',
+                edit: 'עריכת מתכון',
+                calculate: 'חשב רשימת קניות',
+                copyWhatsapp: 'שתף',
+                emptyRecipes: 'אין מתכונים עדיין. הגיע הזמן לבשל!',
+                emptyOrders: 'בחר מנות כדי לחשב רשימת קניות.',
+                addIngredient: 'הוסף פריט',
+                recipeImage: 'תמונת המנה',
+                tapToUpload: 'העלאת תמונה',
+                sortIngredients: 'מיון א-ב',
+                searchPlaceholder: 'חפש מתכון...',
+                aiScan: 'סריקת AI חכמה',
+                aiScanning: 'סורק...',
+                aiScanError: 'סריקת ה-AI נכשלה. נסה שוב.',
+                prepTime: 'זמן הכנה',
+                cookTime: 'זמן בישול',
+                minutes: 'דק\'',
+                magicScan: 'סריקת קסם',
+                categories: { meat: 'בשרי', dairy: 'חלבי', pareve: 'פרווה', dessert: 'קינוח', other: 'אחר' },
+                units: { grams: 'גרם', kg: 'ק"ג', units: 'יחידות', liters: 'ליטר', cans: 'קופסאות', packs: 'חבילות' }
+            }
+        };
+
+        const CATEGORY_OPTIONS = ['meat', 'dairy', 'pareve', 'dessert', 'other'];
+        const UNIT_OPTIONS = ['grams', 'kg', 'units', 'liters', 'cans', 'packs'];
+
+        // --- Application State ---
+        let state = {
+            lang: localStorage.getItem('smart_pantry_lang') || 'he',
+            recipes: JSON.parse(localStorage.getItem('smart_pantry_recipes') || '[]'),
+            orders: JSON.parse(localStorage.getItem('smart_pantry_orders') || '{}'),
+            activeTab: 'recipes',
+            recipeSearch: '',
+            isShoppingListSorted: localStorage.getItem('smart_pantry_shopping_sorted') === 'true',
+            checkedItems: new Set(),
+            editingRecipeId: null,
+            modalIngredients: [],
+            modalCategory: 'other'
+        };
+
+        const saveState = () => {
+            localStorage.setItem('smart_pantry_recipes', JSON.stringify(state.recipes));
+            localStorage.setItem('smart_pantry_orders', JSON.stringify(state.orders));
+            localStorage.setItem('smart_pantry_lang', state.lang);
+            localStorage.setItem('smart_pantry_shopping_sorted', state.isShoppingListSorted);
+        };
+
+        const t = () => TRANSLATIONS[state.lang];
+
+        // --- AI Image Processing ---
+        const processImageForAI = (dataUrl) => {
+            const parts = dataUrl.split(',');
+            const mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+            const data = parts[1];
+            return { inlineData: { mimeType, data } };
+        };
+
+        const executeAIScan = async (base64) => {
+            const ai = new GoogleGenAI({ apiKey: AIzaSyDhfLiJawI3ARUNrP0nd1amDABaVgeVX3o });
+            const targetLang = state.lang === 'he' ? 'Hebrew' : 'English';
+            
+            try {
+                const response = await ai.models.generateContent({
+                    model: 'gemini-3-flash-preview',
+                    contents: { 
+                        parts: [
+                            processImageForAI(base64),
+                            { text: `Extract the recipe from this image into JSON in ${targetLang}. Use these units: grams, kg, units, liters, cans, packs. Categories: meat, dairy, pareve, dessert, other. Respond with ONLY JSON.` }
+                        ] 
+                    },
+                    config: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: Type.OBJECT,
+                            properties: {
+                                name: { type: Type.STRING },
+                                category: { type: Type.STRING },
+                                prepTime: { type: Type.NUMBER },
+                                cookTime: { type: Type.NUMBER },
+                                ingredients: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            name: { type: Type.STRING },
+                                            quantity: { type: Type.NUMBER },
+                                            unit: { type: Type.STRING }
+                                        },
+                                        required: ["name", "quantity", "unit"]
+                                    }
+                                }
+                            },
+                            required: ["name", "category", "ingredients"]
+                        }
+                    }
+                });
+                return JSON.parse(response.text.trim());
+            } catch (err) {
+                console.error("Gemini Scan Failed:", err);
+                throw err;
+            }
+        };
+
+        // --- Render Engine ---
+        const render = () => {
+            const trans = t();
+            document.documentElement.lang = state.lang;
+            document.body.dir = state.lang === 'he' ? 'rtl' : 'ltr';
+            
+            document.getElementById('appTitle').textContent = trans.title;
+            document.getElementById('langToggleLabel').textContent = state.lang === 'en' ? '🇮🇱 HE' : '🇺🇸 EN';
+            
+            // Navigation Update
+            ['recipes', 'orders', 'shopping'].forEach(id => {
+                const btn = document.getElementById(`nav-${id}`);
+                const bg = btn.querySelector('.nav-icon-bg');
+                const label = btn.querySelector('.nav-label');
+                label.textContent = trans[id];
+                
+                if (state.activeTab === id) {
+                    btn.classList.add('text-[#FF8A3D]');
+                    btn.classList.remove('text-[#3D2B1F]/20');
+                    bg.classList.add('active-tab-indicator');
+                    label.classList.remove('opacity-60');
+                } else {
+                    btn.classList.remove('text-[#FF8A3D]');
+                    btn.classList.add('text-[#3D2B1F]/20');
+                    bg.classList.remove('active-tab-indicator');
+                    label.classList.add('opacity-60');
+                }
+            });
+
+            const main = document.getElementById('mainContent');
+            main.innerHTML = '';
+            document.getElementById('calculateBtnContainer').classList.add('hidden');
+
+            if (state.activeTab === 'recipes') renderRecipesTab(main, trans);
+            else if (state.activeTab === 'orders') {
+                renderOrdersTab(main, trans);
+                if (state.recipes.length > 0) document.getElementById('calculateBtnContainer').classList.remove('hidden');
+            }
+            else if (state.activeTab === 'shopping') renderShoppingTab(main, trans);
+
+            lucide.createIcons();
+        };
+
+        const renderRecipesTab = (container, trans) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'space-y-8 animate-fade-in';
+            wrap.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <h2 class="text-3xl font-black tracking-tight">${trans.recipes}</h2>
+                    <button id="addRecipeTrigger" class="bg-[#FF8A3D] text-white p-4 rounded-3xl shadow-xl active:scale-90 transition-all"><i data-lucide="plus"></i></button>
+                </div>
+                <div class="relative group">
+                    <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-[#3D2B1F]/20 group-focus-within:text-[#FF8A3D] transition-colors w-5 h-5"></i>
+                    <input type="text" id="recipeSearch" value="${state.recipeSearch}" placeholder="${trans.searchPlaceholder}" class="w-full bg-white rounded-[2rem] pl-14 pr-6 py-5 shadow-sm border border-transparent focus:border-[#FF8A3D]/10 outline-none font-bold" />
+                </div>
+            `;
+            container.appendChild(wrap);
+
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-1 gap-8';
+            wrap.appendChild(grid);
+
+            const list = state.recipes.filter(r => r.name.toLowerCase().includes(state.recipeSearch.toLowerCase()));
+
+            if (list.length === 0) {
+                grid.innerHTML = `<div class="text-center py-24 opacity-20"><i data-lucide="chef-hat" class="w-20 h-20 mx-auto mb-4"></i><p class="font-black uppercase tracking-widest text-xs">${trans.emptyRecipes}</p></div>`;
+            } else {
+                list.forEach(r => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-[3rem] overflow-hidden shadow-xl border border-[#3D2B1F]/5 active:scale-[0.98] transition-all cursor-pointer group';
+                    card.onclick = () => window.openModal(r.id);
+                    card.innerHTML = `
+                        <div class="h-64 bg-[#FEF9F3] relative overflow-hidden">
+                            <img src="${r.imageUrl || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1200'}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ${!r.imageUrl ? 'opacity-30' : ''}" />
+                            <div class="absolute top-6 left-6 bg-white/95 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase text-[#FF8A3D] shadow-xl border border-white/20 tracking-widest">${trans.categories[r.category] || r.category}</div>
+                        </div>
+                        <div class="p-8">
+                            <h3 class="font-black text-2xl mb-3 text-[#3D2B1F] group-hover:text-[#FF8A3D] transition-colors">${r.name}</h3>
+                            <div class="flex gap-5 text-[#3D2B1F]/40 text-[10px] font-black uppercase tracking-widest">
+                                ${r.prepTime ? `<span class="flex items-center gap-1.5"><i data-lucide="timer" class="w-3 h-3"></i>${r.prepTime}${trans.minutes}</span>` : ''}
+                                ${r.cookTime ? `<span class="flex items-center gap-1.5"><i data-lucide="flame" class="w-3 h-3 text-[#FF8A3D]"></i>${r.cookTime}${trans.minutes}</span>` : ''}
+                                <span class="flex items-center gap-1.5"><i data-lucide="list" class="w-3 h-3"></i>${r.ingredients.length} items</span>
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+
+            document.getElementById('addRecipeTrigger').onclick = () => window.openModal();
+            document.getElementById('recipeSearch').oninput = (e) => {
+                state.recipeSearch = e.target.value;
+                render();
+            };
+        };
+
+        const renderOrdersTab = (container, trans) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'space-y-8 animate-fade-in pb-40';
+            wrap.innerHTML = `<h2 class="text-3xl font-black tracking-tight">${trans.orders}</h2>`;
+            container.appendChild(wrap);
+
+            if (state.recipes.length === 0) {
+                wrap.innerHTML += `<div class="text-center py-24 opacity-20"><p class="font-black uppercase tracking-widest text-xs">${trans.emptyRecipes}</p></div>`;
+                return;
+            }
+
+            state.recipes.forEach(r => {
+                const qty = state.orders[r.id] || 0;
+                const row = document.createElement('div');
+                row.className = 'bg-white rounded-[2.5rem] p-5 shadow-sm flex items-center gap-5 border border-[#3D2B1F]/5 transition-all active:scale-[0.99]';
+                row.innerHTML = `
+                    <div class="w-20 h-20 rounded-3xl bg-[#FEF9F3] overflow-hidden flex-shrink-0 shadow-inner">
+                        <img src="${r.imageUrl || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1200'}" class="w-full h-full object-cover ${!r.imageUrl ? 'opacity-20' : ''}" />
+                    </div>
+                    <span class="flex-1 font-black text-xl text-[#3D2B1F] truncate">${r.name}</span>
+                    <div class="flex items-center gap-4 bg-[#FEF9F3] p-2 rounded-3xl shadow-inner">
+                        <button class="m-btn w-11 h-11 flex items-center justify-center bg-white rounded-2xl shadow-sm active:scale-90 transition-all"><i data-lucide="minus"></i></button>
+                        <span class="w-8 text-center font-black text-xl text-[#3D2B1F]">${qty}</span>
+                        <button class="p-btn w-11 h-11 flex items-center justify-center bg-[#FF8A3D] text-white rounded-2xl shadow-sm active:scale-90 transition-all"><i data-lucide="plus"></i></button>
+                    </div>
+                `;
+                wrap.appendChild(row);
+
+                row.querySelector('.m-btn').onclick = () => {
+                    state.orders[r.id] = Math.max(0, (state.orders[r.id] || 0) - 1);
+                    saveState();
+                    render();
+                };
+                row.querySelector('.p-btn').onclick = () => {
+                    state.orders[r.id] = (state.orders[r.id] || 0) + 1;
+                    saveState();
+                    render();
+                };
+            });
+
+            document.getElementById('calculateBtnLabel').textContent = trans.calculate;
+            document.getElementById('calculateBtn').onclick = () => {
+                state.activeTab = 'shopping';
+                render();
+            };
+        };
+
+        const renderShoppingTab = (container, trans) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'space-y-8 animate-fade-in';
+            const list = calculateAggregatedList();
+            
+            wrap.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <h2 class="text-3xl font-black tracking-tight">${trans.shopping}</h2>
+                    ${list.length > 0 ? `
+                        <div class="flex gap-2">
+                            <button id="whatsapp" class="bg-[#25D366] text-white px-5 py-3 rounded-2xl font-black text-[11px] uppercase tracking-wider flex items-center gap-2 shadow-lg active:scale-95"><i data-lucide="message-circle" class="w-4 h-4"></i> ${trans.copyWhatsapp}</button>
+                            <button id="sort" class="bg-white text-[#3D2B1F]/40 border border-[#3D2B1F]/10 px-4 py-3 rounded-2xl shadow-sm active:scale-95"><i data-lucide="arrow-down-az" class="w-5 h-5 ${state.isShoppingListSorted ? 'text-[#FF8A3D]' : ''}"></i></button>
+                            <button id="reset" class="bg-red-50 text-red-500 px-4 py-3 rounded-2xl active:scale-95"><i data-lucide="rotate-ccw" class="w-5 h-5"></i></button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            container.appendChild(wrap);
+
+            if (list.length === 0) {
+                wrap.innerHTML += `<div class="text-center py-24 opacity-20"><i data-lucide="shopping-cart" class="w-20 h-20 mx-auto mb-4"></i><p class="font-black uppercase tracking-widest text-xs">${trans.emptyOrders}</p></div>`;
+            } else {
+                const box = document.createElement('div');
+                box.className = 'bg-white rounded-[3rem] shadow-sm divide-y divide-[#3D2B1F]/5 border border-[#3D2B1F]/5 overflow-hidden';
+                list.forEach(item => {
+                    const key = `${item.name}_${item.unit}`;
+                    const done = state.checkedItems.has(key);
+                    const el = document.createElement('div');
+                    el.className = `flex items-center justify-between p-7 cursor-pointer transition-all ${done ? 'bg-gray-50' : 'bg-white'}`;
+                    el.innerHTML = `
+                        <div class="flex items-center gap-5">
+                            <i data-lucide="${done ? 'check-circle-2' : 'circle'}" class="${done ? 'text-[#FF8A3D]' : 'text-[#3D2B1F]/10'} w-7 h-7"></i>
+                            <span class="font-bold text-xl ${done ? 'line-through text-[#3D2B1F]/30' : 'text-[#3D2B1F]'}">${item.name}</span>
+                        </div>
+                        <span class="font-black text-xl ${done ? 'text-[#FF8A3D]/30' : 'text-[#FF8A3D]'}">${item.quantity} ${trans.units[item.unit]}</span>
+                    `;
+                    el.onclick = () => {
+                        if (state.checkedItems.has(key)) state.checkedItems.delete(key);
+                        else state.checkedItems.add(key);
+                        render();
+                    };
+                    box.appendChild(el);
+                });
+                wrap.appendChild(box);
+                
+                document.getElementById('reset').onclick = () => {
+                    if (confirm(state.lang === 'en' ? 'Reset list?' : 'לאפס רשימה?')) {
+                        state.orders = {};
+                        state.checkedItems.clear();
+                        saveState();
+                        render();
+                    }
+                };
+                document.getElementById('sort').onclick = () => {
+                    state.isShoppingListSorted = !state.isShoppingListSorted;
+                    saveState();
+                    render();
+                };
+                document.getElementById('whatsapp').onclick = () => {
+                    let msg = `🛒 *${t().shopping}*\n\n`;
+                    list.forEach(i => msg += `• ${i.name}: ${i.quantity} ${trans.units[i.unit]}\n`);
+                    navigator.clipboard.writeText(msg).then(() => alert(state.lang === 'en' ? 'Copied!' : 'הועתק!'));
+                };
+            }
+        };
+
+        const calculateAggregatedList = () => {
+            const totals = {};
+            Object.entries(state.orders).forEach(([id, qty]) => {
+                const r = state.recipes.find(rcp => rcp.id === id);
+                if (!r || qty <= 0) return;
+                r.ingredients.forEach(ing => {
+                    const key = `${ing.name.toLowerCase().trim()}_${ing.unit}`;
+                    if (totals[key]) totals[key].quantity += ing.quantity * qty;
+                    else totals[key] = { ...ing, quantity: ing.quantity * qty };
+                });
+            });
+            const res = Object.values(totals);
+            if (state.isShoppingListSorted) res.sort((a,b) => a.name.localeCompare(b.name, state.lang === 'he' ? 'he' : 'en'));
+            return res;
+        };
+
+        // --- Modal Control ---
+        window.openModal = (id = null) => {
+            const trans = t();
+            state.editingRecipeId = id;
+            const r = id ? state.recipes.find(i => i.id === id) : null;
+            
+            document.getElementById('modalTitle').textContent = r ? trans.edit : trans.addRecipe;
+            document.getElementById('recipeNameInput').value = r ? r.name : '';
+            document.getElementById('prepTimeInput').value = r?.prepTime || '';
+            document.getElementById('cookTimeInput').value = r?.cookTime || '';
+            state.modalCategory = r?.category || 'other';
+            state.modalIngredients = r ? JSON.parse(JSON.stringify(r.ingredients)) : [{ id: Date.now().toString(), name: '', quantity: 1, unit: 'units' }];
+            
+            const preview = document.getElementById('recipeImagePreview');
+            preview.src = r?.imageUrl || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&q=80&w=1200';
+            preview.classList.toggle('opacity-40', !r?.imageUrl);
+            preview.classList.toggle('grayscale-[0.2]', !r?.imageUrl);
+            
+            document.getElementById('imagePlaceholder').classList.toggle('hidden', !!r?.imageUrl);
+            document.getElementById('magicScanBtn').classList.toggle('hidden', !r?.imageUrl);
+            document.getElementById('deleteRecipeBtn').classList.toggle('hidden', !r);
+            
+            // Sync Labels
+            document.getElementById('recipeImageLabel').textContent = trans.recipeImage;
+            document.getElementById('tapToUploadLabel').textContent = trans.tapToUpload;
+            document.getElementById('recipeNameLabel').textContent = trans.recipeName;
+            document.getElementById('prepTimeLabel').textContent = `${trans.prepTime} (${trans.minutes})`;
+            document.getElementById('cookTimeLabel').textContent = `${trans.cookTime} (${trans.minutes})`;
+            document.getElementById('categoryLabel').textContent = trans.category;
+            document.getElementById('ingredientsSectionLabel').textContent = trans.recipes; 
+            document.getElementById('addIngredientBtnLabel').textContent = trans.addIngredient;
+            document.getElementById('saveBtnLabel').textContent = trans.save;
+            document.getElementById('aiScanBtnLabel').textContent = trans.aiScan;
+            document.getElementById('magicScanLabel').textContent = trans.magicScan;
+
+            renderChips();
+            renderIngs();
+            document.getElementById('recipeModal').classList.add('open');
+            lucide.createIcons();
+        };
+
+        const renderChips = () => {
+            const box = document.getElementById('categoryChips');
+            box.innerHTML = '';
+            CATEGORY_OPTIONS.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${state.modalCategory === opt ? 'bg-[#FF8A3D] text-white shadow-lg' : 'bg-white text-[#3D2B1F]/40 border border-[#3D2B1F]/5'}`;
+                btn.textContent = t().categories[opt];
+                btn.onclick = () => { state.modalCategory = opt; renderChips(); };
+                box.appendChild(btn);
+            });
+        };
+
+        const renderIngs = () => {
+            const list = document.getElementById('ingredientsList');
+            list.innerHTML = '';
+            state.modalIngredients.forEach((ing, i) => {
+                const el = document.createElement('div');
+                el.className = 'bg-white rounded-3xl p-5 shadow-sm space-y-4 relative border border-[#3D2B1F]/5 animate-fade-in ingredient-item';
+                el.innerHTML = `
+                    <button type="button" class="del absolute top-3 right-3 text-red-300 p-2 active:scale-75"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    <input type="text" value="${ing.name}" placeholder="${t().ingredientName}" class="nm w-full bg-[#FEF9F3] rounded-2xl px-5 py-3 text-sm font-bold border border-transparent outline-none" />
+                    <div class="flex gap-3">
+                        <input type="number" step="any" value="${ing.quantity}" class="qty w-28 bg-[#FEF9F3] rounded-2xl px-5 py-3 text-sm font-bold border border-transparent outline-none" />
+                        <select class="ut flex-1 bg-[#FEF9F3] rounded-2xl px-5 py-3 text-sm font-bold border border-transparent outline-none appearance-none">
+                            ${UNIT_OPTIONS.map(u => `<option value="${u}" ${ing.unit === u ? 'selected' : ''}>${t().units[u]}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+                list.appendChild(el);
+                
+                el.querySelector('.nm').oninput = (e) => state.modalIngredients[i].name = e.target.value;
+                el.querySelector('.qty').oninput = (e) => state.modalIngredients[i].quantity = parseFloat(e.target.value) || 0;
+                el.querySelector('.ut').onchange = (e) => state.modalIngredients[i].unit = e.target.value;
+                el.querySelector('.del').onclick = () => { state.modalIngredients.splice(i, 1); renderIngs(); };
+            });
+            lucide.createIcons();
+        };
+
+        // --- Event Orchestration ---
+        document.getElementById('langToggle').onclick = () => {
+            state.lang = state.lang === 'en' ? 'he' : 'en';
+            saveState();
+            render();
+        };
+
+        ['recipes', 'orders', 'shopping'].forEach(id => {
+            document.getElementById(`nav-${id}`).onclick = () => {
+                state.activeTab = id;
+                render();
+            };
+        });
+
+        document.getElementById('closeModalBtn').onclick = () => document.getElementById('recipeModal').classList.remove('open');
+        document.getElementById('addIngredientBtn').onclick = () => {
+            state.modalIngredients.push({ id: Date.now().toString(), name: '', quantity: 1, unit: 'units' });
+            renderIngs();
+        };
+
+        document.getElementById('fileInput').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (re) => {
+                const pre = document.getElementById('recipeImagePreview');
+                pre.src = re.target.result;
+                pre.classList.remove('opacity-40', 'grayscale-[0.2]');
+                document.getElementById('imagePlaceholder').classList.add('hidden');
+                document.getElementById('magicScanBtn').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        };
+
+        document.getElementById('imagePlaceholder').onclick = () => document.getElementById('fileInput').click();
+
+        const triggerAI = async (img) => {
+            const over = document.getElementById('aiScanningOverlay');
+            over.classList.remove('hidden');
+            document.getElementById('aiScanningText').textContent = t().aiScanning;
+            try {
+                const res = await executeAIScan(img);
+                document.getElementById('recipeNameInput').value = res.name || '';
+                state.modalCategory = res.category?.toLowerCase() || 'other';
+                document.getElementById('prepTimeInput').value = res.prepTime || '';
+                document.getElementById('cookTimeInput').value = res.cookTime || '';
+                state.modalIngredients = res.ingredients.map(i => ({ ...i, id: Date.now() + Math.random().toString() }));
+                renderChips();
+                renderIngs();
+                
+                const pre = document.getElementById('recipeImagePreview');
+                pre.src = img;
+                pre.classList.remove('opacity-40', 'grayscale-[0.2]');
+                document.getElementById('imagePlaceholder').classList.add('hidden');
+                document.getElementById('magicScanBtn').classList.remove('hidden');
+            } catch (err) {
+                alert(t().aiScanError);
+            } finally { over.classList.add('hidden'); }
+        };
+
+        document.getElementById('magicScanBtn').onclick = (e) => {
+            e.stopPropagation();
+            triggerAI(document.getElementById('recipeImagePreview').src);
+        };
+
+        document.getElementById('aiScanBtn').onclick = () => document.getElementById('aiFileInput').click();
+        document.getElementById('aiFileInput').onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (re) => triggerAI(re.target.result);
+            reader.readAsDataURL(file);
+        };
+
+        document.getElementById('recipeForm').onsubmit = (e) => {
+            e.preventDefault();
+            const payload = {
+                id: state.editingRecipeId || Date.now().toString(),
+                name: document.getElementById('recipeNameInput').value,
+                category: state.modalCategory,
+                prepTime: parseInt(document.getElementById('prepTimeInput').value) || undefined,
+                cookTime: parseInt(document.getElementById('cookTimeInput').value) || undefined,
+                imageUrl: document.getElementById('recipeImagePreview').src.startsWith('data:') ? document.getElementById('recipeImagePreview').src : (state.editingRecipeId ? state.recipes.find(i => i.id === state.editingRecipeId)?.imageUrl : undefined),
+                ingredients: state.modalIngredients.filter(i => i.name.trim() !== '')
+            };
+            if (state.editingRecipeId) state.recipes = state.recipes.map(i => i.id === state.editingRecipeId ? payload : i);
+            else state.recipes.push(payload);
+            saveState();
+            document.getElementById('recipeModal').classList.remove('open');
+            render();
+        };
+
+        document.getElementById('deleteRecipeBtn').onclick = () => {
+            if (confirm(t().delete + '?')) {
+                state.recipes = state.recipes.filter(i => i.id !== state.editingRecipeId);
+                delete state.orders[state.editingRecipeId];
+                saveState();
+                document.getElementById('recipeModal').classList.remove('open');
+                render();
+            }
+        };
+
+        // Start
+        render();
+    </script>
 </body>
 </html>
