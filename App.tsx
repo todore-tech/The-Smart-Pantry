@@ -51,6 +51,7 @@ function parseBase64(dataUrl: string) {
 }
 
 const runAIScan = async (base64Image: string, lang: Language) => {
+  // Always create a new instance right before use to ensure the latest API key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const { mimeType, data } = parseBase64(base64Image);
   const targetLang = lang === 'he' ? 'Hebrew' : 'English';
@@ -62,7 +63,8 @@ const runAIScan = async (base64Image: string, lang: Language) => {
         parts: [
           { inlineData: { mimeType, data } },
           { text: `TASK: Extract the recipe from this image and translate it to ${targetLang}. 
-          IMAGE TYPE: Could be a printed recipe, handwritten note, or a photo of a screen.
+          IMAGE TYPE: This could be a photo of a cookbook, a handwritten note, or a restaurant menu.
+          HEBREW SUPPORT: If the target language is Hebrew, ensure all text fields (name, ingredients) are in Hebrew.
           EXTRACT:
           1. name: string (the dish title).
           2. category: MUST BE one of [meat, dairy, pareve, dessert, other].
@@ -70,13 +72,14 @@ const runAIScan = async (base64Image: string, lang: Language) => {
           4. cookTime: number (minutes, if found).
           5. ingredients: array of objects { 'name': string, 'quantity': number, 'unit': string (must be: grams, kg, units, liters, cans, packs) }.
           
-          Respond ONLY with valid JSON.` }
+          Respond ONLY with valid JSON. Do not include any markdown formatting if possible, just the raw JSON object.` }
         ] 
       },
       config: {
-        systemInstruction: `You are an elite culinary data extraction AI. Always respond with perfectly structured JSON. 
-        Map categories to exactly: meat, dairy, pareve, dessert, other.
-        Map units to exactly: grams, kg, units, liters, cans, packs.`,
+        systemInstruction: `You are an elite culinary data extraction AI. You excel at reading blurred or stylized text from kitchen photos. 
+        Always respond with perfectly structured JSON according to the schema. 
+        Map categories strictly to: meat, dairy, pareve, dessert, other.
+        Map units strictly to: grams, kg, units, liters, cans, packs.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -105,12 +108,34 @@ const runAIScan = async (base64Image: string, lang: Language) => {
 
     const text = response.text;
     if (!text) throw new Error("EMPTY_RESPONSE");
-    return JSON.parse(text.replace(/```json|```/g, '').trim());
-  } catch (error: any) {
-    console.error("AI Scan Error:", error);
-    if (error?.message?.includes("API_KEY") || error?.status === 403 || error?.message?.includes("Requested entity was not found")) {
-      throw new Error("API_KEY_ERROR");
+    
+    try {
+      const cleanedText = text.replace(/```json|```/g, '').trim();
+      const result = JSON.parse(cleanedText);
+      
+      // Secondary validation for required fields
+      if (!result.name || !result.ingredients || !Array.isArray(result.ingredients)) {
+        throw new Error("INCOMPLETE_DATA");
+      }
+      
+      return result;
+    } catch (parseError) {
+      console.error("JSON Parse Error:", parseError, "Raw Text:", text);
+      throw new Error("INVALID_JSON_RESPONSE");
     }
+  } catch (error: any) {
+    console.error("AI Scan API Error:", error);
+    const errorMessage = error?.message || "";
+    
+    // Check for specific API Key / Project errors
+    if (errorMessage.includes("API_KEY") || 
+        errorMessage.includes("403") || 
+        errorMessage.includes("Requested entity was not found") ||
+        errorMessage.includes("billing") ||
+        errorMessage.includes("Project")) {
+      throw new Error("API_KEY_OR_PROJECT_ERROR");
+    }
+    
     throw error;
   }
 };
@@ -160,10 +185,14 @@ const RecipeModal: React.FC<{
   const performAiAnalysis = async (base64: string) => {
     setIsAiScanning(true);
     try {
+      // @ts-ignore - Handle mandatory key selection for certain environments
       if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
+        // @ts-ignore
         await window.aistudio.openSelectKey();
       }
+      
       const result = await runAIScan(base64, lang);
+      
       if (result.name) setName(result.name);
       if (result.category && CATEGORY_OPTIONS.includes(result.category.toLowerCase() as any)) {
         setCategory(result.category.toLowerCase());
@@ -180,8 +209,24 @@ const RecipeModal: React.FC<{
       }
       setImageUrl(base64);
     } catch (err: any) {
-      if (err.message === "API_KEY_ERROR" && window.aistudio) {
-        await window.aistudio.openSelectKey();
+      const errMsg = err.message || "";
+      console.error("Analysis process failed:", err);
+
+      if (errMsg === "API_KEY_OR_PROJECT_ERROR") {
+        const keyAlert = lang === 'en' 
+          ? "There was a problem with your API project. Please ensure you have selected a valid project with billing enabled."
+          : "הייתה בעיה עם פרויקט ה-API שלך. אנא וודא שבחרת פרויקט תקין עם חיוב מופעל.";
+        alert(keyAlert);
+        
+        // @ts-ignore - Re-prompt for key as per guidelines
+        if (window.aistudio) {
+          await window.aistudio.openSelectKey();
+        }
+      } else if (errMsg === "INVALID_JSON_RESPONSE" || errMsg === "INCOMPLETE_DATA") {
+        const dataAlert = lang === 'en'
+          ? "The AI had trouble formatting the recipe data. Please try again with a clearer photo of the list."
+          : "הבינה המלאכותית התקשתה בעיבוד נתוני המתכון. אנא נסו שוב עם צילום ברור יותר של הרשימה.";
+        alert(dataAlert);
       } else {
         alert(t.aiScanError || "Could not read recipe. Please try a clearer photo.");
       }
@@ -226,6 +271,7 @@ const RecipeModal: React.FC<{
         <div className="absolute inset-0 z-[110] bg-[#3D2B1F]/60 backdrop-blur-md flex flex-col items-center justify-center text-white p-6 text-center">
           <Loader2 size={48} className="animate-spin mb-4 text-[#FF8A3D]" />
           <p className="text-xl font-bold">{t.aiScanning}</p>
+          <p className="mt-2 text-sm opacity-80">{lang === 'en' ? 'Converting image to recipe data...' : 'ממיר את התמונה לנתוני מתכון...'}</p>
         </div>
       )}
       <form onSubmit={(e) => { e.preventDefault(); if (!name.trim()) return; onSave({ id: editingRecipe?.id || Date.now().toString(), name: name.trim(), category, prepTime, cookTime, ingredients: ingredients.filter(i => i.name.trim() !== ''), imageUrl }); }} className="flex flex-col h-full">
@@ -458,6 +504,26 @@ const App: React.FC = () => {
     return list;
   }, [recipes, orders, isShoppingListSorted, lang]);
 
+  const copyToWhatsApp = useCallback(() => {
+    if (shoppingList.length === 0) return;
+    
+    const title = lang === 'en' ? '🛒 *My Shopping List*' : '🛒 *רשימת הקניות שלי*';
+    const date = new Date().toLocaleDateString(lang === 'en' ? 'en-US' : 'he-IL');
+    
+    let message = `${title} (${date})\n\n`;
+    
+    shoppingList.forEach((item) => {
+      const unitLabel = (t.units as any)[item.unit];
+      message += `• ${item.name}: *${item.quantity} ${unitLabel}*\n`;
+    });
+    
+    navigator.clipboard.writeText(message).then(() => {
+      alert(lang === 'en' ? 'List copied to clipboard!' : 'הרשימה הועתקה ללוח!');
+    }).catch(err => {
+      console.error('Failed to copy list: ', err);
+    });
+  }, [shoppingList, lang, t]);
+
   return (
     <div className="min-h-screen pb-32 flex flex-col">
       <header className="sticky top-0 z-40 bg-[#FEF9F3]/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-[#3D2B1F]/5">
@@ -607,6 +673,13 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-bold tracking-tight">{t.shopping}</h2>
               {shoppingList.length > 0 && (
                 <div className="flex gap-2">
+                  <button 
+                    onClick={copyToWhatsApp}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-sm bg-[#25D366] text-white active:scale-95"
+                  >
+                    <MessageCircle size={16} />
+                    {t.copyWhatsapp}
+                  </button>
                   <button 
                     onClick={() => setIsShoppingListSorted(!isShoppingListSorted)}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-sm ${isShoppingListSorted ? 'bg-[#FF8A3D] text-white' : 'bg-white text-[#3D2B1F]/60 border border-[#3D2B1F]/10'}`}
