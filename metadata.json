@@ -1,0 +1,7 @@
+{
+  "name": "The Smart Pantry",
+  "description": "A high-performance bilingual recipe and inventory management app designed for home-chef business owners, featuring automated shopping list calculation and smart unit conversion.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
