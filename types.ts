@@ -14,6 +14,8 @@ export interface Recipe {
   category: string;
   ingredients: Ingredient[];
   imageUrl?: string;
+  prepTime?: number; // in minutes
+  cookTime?: number; // in minutes
 }
 
 export interface Order {
@@ -52,6 +54,9 @@ export interface Translation {
   aiScan: string;
   aiScanning: string;
   aiScanError: string;
+  prepTime: string;
+  cookTime: string;
+  minutes: string;
   categories: {
     meat: string;
     dairy: string;

@@ -32,6 +32,9 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     aiScan: 'Scan Recipe (AI)',
     aiScanning: 'Analyzing recipe image...',
     aiScanError: 'Could not read recipe. Please try a clearer photo.',
+    prepTime: 'Prep Time',
+    cookTime: 'Cook Time',
+    minutes: 'min',
     categories: {
       meat: 'Meat',
       dairy: 'Dairy',
@@ -78,6 +81,9 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     aiScan: 'סרוק מתכון (AI)',
     aiScanning: 'מנתח את התמונה...',
     aiScanError: 'לא הצלחתי לקרוא את המתכון. נסה תמונה ברורה יותר.',
+    prepTime: 'זמן הכנה',
+    cookTime: 'זמן בישול',
+    minutes: 'דקות',
     categories: {
       meat: 'בשרי',
       dairy: 'חלבי',
