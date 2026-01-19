@@ -36,31 +36,39 @@ function parseBase64(dataUrl: string) {
 }
 
 const runAIScan = async (base64Image: string, lang: Language) => {
+  // Create instance right before call to ensure latest API Key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const { mimeType, data } = parseBase64(base64Image);
   
-  const prompt = `Analyze this recipe image. Extract:
-  1. Recipe Name (Translate to ${lang === 'he' ? 'Hebrew' : 'English'}).
-  2. Category (one of: meat, dairy, pareve, dessert, other).
-  3. Ingredients list with numeric quantity and unit (grams, kg, units, liters, cans, packs).
-  Important: All text must be in ${lang === 'he' ? 'Hebrew' : 'English'}. Return valid JSON.`;
-
+  const targetLang = lang === 'he' ? 'Hebrew' : 'English';
+  
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-flash-preview',
       contents: { 
         parts: [
           { inlineData: { mimeType, data } },
-          { text: prompt }
+          { text: `Extract the recipe from this image. Provide the recipe name, its category, and a list of ingredients. Translate everything to ${targetLang}.` }
         ] 
       },
       config: {
+        systemInstruction: `You are a professional chef's assistant. Your job is to extract recipe data from images. 
+        Always respond in valid JSON. 
+        Translate all output text into ${targetLang}.
+        Valid categories: meat, dairy, pareve, dessert, other.
+        Valid units: grams, kg, units, liters, cans, packs.`,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            name: { type: Type.STRING },
-            category: { type: Type.STRING },
+            name: { 
+              type: Type.STRING,
+              description: "The name of the dish."
+            },
+            category: { 
+              type: Type.STRING,
+              description: "One of: meat, dairy, pareve, dessert, other"
+            },
             ingredients: {
               type: Type.ARRAY,
               items: {
@@ -68,7 +76,10 @@ const runAIScan = async (base64Image: string, lang: Language) => {
                 properties: {
                   name: { type: Type.STRING },
                   quantity: { type: Type.NUMBER },
-                  unit: { type: Type.STRING }
+                  unit: { 
+                    type: Type.STRING,
+                    description: "One of: grams, kg, units, liters, cans, packs"
+                  }
                 },
                 required: ["name", "quantity", "unit"]
               }
@@ -79,10 +90,14 @@ const runAIScan = async (base64Image: string, lang: Language) => {
       }
     });
 
-    return JSON.parse(response.text || '{}');
+    const text = response.text;
+    if (!text) throw new Error("Empty response from AI");
+    return JSON.parse(text);
   } catch (error: any) {
-    console.error("AI Scan Error:", error);
-    if (error?.message?.includes("entity was not found") || error?.message?.includes("API key")) {
+    console.error("AI Scan Error Details:", error);
+    const msg = error?.message || "";
+    // If key not found or permission error, trigger key selector
+    if (msg.includes("entity was not found") || msg.includes("API key") || msg.includes("403") || msg.includes("401")) {
       throw new Error("API_KEY_REQUIRED");
     }
     throw error;
@@ -128,8 +143,8 @@ const RecipeModal: React.FC<{
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert("Image too large (max 2MB)");
+      if (file.size > 4 * 1024 * 1024) {
+        alert("Image too large (max 4MB)");
         return;
       }
       const reader = new FileReader();
@@ -146,31 +161,40 @@ const RecipeModal: React.FC<{
         const base64 = reader.result as string;
         setIsAiScanning(true);
         try {
+          // Check for API key if environment supports it
           if (window.aistudio && !(await window.aistudio.hasSelectedApiKey())) {
             await window.aistudio.openSelectKey();
           }
+          
           const result = await runAIScan(base64, lang);
+          
           if (result.name) setName(result.name);
-          if (result.category && CATEGORY_OPTIONS.includes(result.category.toLowerCase() as any)) {
-            setCategory(result.category.toLowerCase());
+          
+          const detectedCategory = result.category?.toLowerCase();
+          if (detectedCategory && CATEGORY_OPTIONS.includes(detectedCategory as any)) {
+            setCategory(detectedCategory);
           }
-          if (result.ingredients) {
+          
+          if (result.ingredients && Array.isArray(result.ingredients)) {
             setIngredients(result.ingredients.map((ing: any) => ({
               id: Math.random().toString(),
-              name: ing.name,
-              quantity: ing.quantity,
-              unit: ing.unit as Unit
+              name: ing.name || '',
+              quantity: typeof ing.quantity === 'number' ? ing.quantity : 1,
+              unit: (ing.unit && ing.unit.toLowerCase()) as Unit || 'units'
             })));
           }
+          
           setImageUrl(base64);
         } catch (err: any) {
           if (err.message === "API_KEY_REQUIRED" && window.aistudio) {
             await window.aistudio.openSelectKey();
           } else {
-            alert(t.aiScanError || "Error scanning image");
+            console.error("Scan Failed:", err);
+            alert(t.aiScanError || "Could not read recipe. Please try a clearer photo.");
           }
         } finally {
           setIsAiScanning(false);
+          if (aiFileInputRef.current) aiFileInputRef.current.value = '';
         }
       };
       reader.readAsDataURL(file);
@@ -203,6 +227,7 @@ const RecipeModal: React.FC<{
         <div className="absolute inset-0 z-[110] bg-[#3D2B1F]/60 backdrop-blur-md flex flex-col items-center justify-center text-white p-6 text-center">
           <Loader2 size={48} className="animate-spin mb-4 text-[#FF8A3D]" />
           <p className="text-xl font-bold">{t.aiScanning}</p>
+          <p className="mt-2 text-white/60 text-sm">{lang === 'en' ? 'Scanning ingredients & quantities...' : 'סורק מרכיבים וכמויות...'}</p>
         </div>
       )}
       <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
@@ -229,7 +254,9 @@ const RecipeModal: React.FC<{
               {imageUrl ? (
                 <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
               ) : (
-                <div className="flex flex-col items-center gap-2 text-[#3D2B1F]/40"><ImageIcon size={48} /></div>
+                <div className="flex flex-col items-center gap-2 text-[#3D2B1F]/40">
+                  <ImageIcon size={48} />
+                </div>
               )}
             </div>
             <button 
@@ -313,7 +340,6 @@ const RecipeModal: React.FC<{
 // --- Main App ---
 
 const App: React.FC = () => {
-  // Safe functional initializers for state
   const [lang, setLang] = useState<Language>(() => {
     try {
       const saved = localStorage.getItem('smart_pantry_lang');
@@ -349,11 +375,9 @@ const App: React.FC = () => {
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
 
-  // Ensure currentLang is always valid
   const currentLang: Language = (lang === 'he') ? 'he' : 'en';
   const t = TRANSLATIONS[currentLang];
 
-  // Persist data
   useEffect(() => {
     try {
       localStorage.setItem('smart_pantry_recipes', JSON.stringify(recipes));
@@ -404,7 +428,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-32 flex flex-col">
-      {/* Header */}
       <header className="sticky top-0 z-40 bg-[#FEF9F3]/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-[#3D2B1F]/5">
         <h1 className="text-xl font-bold text-[#3D2B1F]">{t.title}</h1>
         <button 
@@ -557,7 +580,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Nav */}
       <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-[#3D2B1F]/5 pb-8 pt-3 px-6 flex justify-around items-center z-50">
         <button onClick={() => setActiveTab('recipes')} className={`flex flex-col items-center gap-1 ${activeTab === 'recipes' ? 'text-[#FF8A3D]' : 'text-[#3D2B1F]/40'}`}>
           <BookOpen size={24} /> <span className="text-[10px] font-bold uppercase tracking-widest">{t.recipes}</span>
@@ -570,7 +592,6 @@ const App: React.FC = () => {
         </button>
       </nav>
 
-      {/* Modals */}
       <RecipeModal 
         isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSave}
         editingRecipe={editingRecipe} t={t} lang={lang}
