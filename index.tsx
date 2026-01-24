@@ -176,7 +176,6 @@ const render = () => {
     (document.getElementById('appTitle') as any).textContent = trans.title;
     (document.getElementById('langToggleLabel') as any).textContent = state.lang === 'en' ? '🇮🇱 HE' : '🇺🇸 EN';
 
-    // Ensure logo is set properly in index.html (it's already handled by hardcoded src but we update the container just in case)
     const titleContainer = document.getElementById('appTitleContainer');
     if (titleContainer) {
         const logoImg = titleContainer.querySelector('img');
@@ -291,7 +290,6 @@ const renderOrdersTab = (container: any, trans: any) => {
     const list = document.getElementById('ordersList') as any;
     
     if (!state.isCookingMode) {
-        // PLANNING MODE
         state.recipes.forEach((r: any) => {
             const qty = state.orders[r.id] || 0;
             const row = document.createElement('div');
@@ -309,7 +307,6 @@ const renderOrdersTab = (container: any, trans: any) => {
             list.appendChild(row);
         });
     } else {
-        // COOKING MODE
         const activeOrders = Object.entries(state.orders).filter(([id, qty]) => (qty as number) > 0);
         
         if (activeOrders.length === 0 && state.completedToday.length === 0) {
@@ -319,7 +316,6 @@ const renderOrdersTab = (container: any, trans: any) => {
                 const r = state.recipes.find(rcp => String(rcp.id) === String(id));
                 if (!r) return;
                 
-                // Splitting into individual entries
                 for(let i=1; i <= qty; i++) {
                     const row = document.createElement('div');
                     row.className = 'bg-white rounded-[2.5rem] p-6 shadow-sm border-l-4 border-[#FF8A3D] flex items-center justify-between animate-fade-in mb-4';
@@ -372,7 +368,6 @@ const handleMarkAsCooked = (recipeId: string) => {
     const qty = state.orders[recipeId] || 0;
     if (!r || qty <= 0) return;
 
-    // Deduct ONE batch from inventory
     r.ingredients.forEach(needed => {
         const inventoryItem = state.inventory.find((inv: any) => 
             inv.name.toLowerCase().trim() === needed.name.toLowerCase().trim() && 
@@ -383,16 +378,14 @@ const handleMarkAsCooked = (recipeId: string) => {
         }
     });
 
-    // Move to completed (Decrement qty by 1)
     state.completedToday.unshift({
-        id: Date.now().toString(),
+        id: Date.now().toString() + Math.random(),
         recipeId: recipeId,
         timestamp: Date.now()
     });
     state.orders[recipeId] = Math.max(0, state.orders[recipeId] - 1);
     
     showToast(t().ingredientsDeducted);
-    
     saveState();
     render();
 };
@@ -405,7 +398,6 @@ const handleUndoCooked = (completedId: string) => {
     const r = state.recipes.find(rcp => String(rcp.id) === String(item.recipeId));
     
     if (r) {
-        // Add back ONE batch to inventory
         r.ingredients.forEach(needed => {
             const inventoryItem = state.inventory.find((inv: any) => 
                 inv.name.toLowerCase().trim() === needed.name.toLowerCase().trim() && 
@@ -414,7 +406,6 @@ const handleUndoCooked = (completedId: string) => {
             if (inventoryItem) {
                 inventoryItem.quantity = inventoryItem.quantity + needed.quantity;
             } else {
-                // If the item was removed from inventory entirely, re-add it
                 state.inventory.push({
                     id: Date.now().toString() + Math.random(),
                     name: needed.name,
@@ -423,14 +414,10 @@ const handleUndoCooked = (completedId: string) => {
                 });
             }
         });
-        
-        // Re-increment order qty
         state.orders[item.recipeId] = (state.orders[item.recipeId] || 0) + 1;
     }
 
-    // Remove from completed
     state.completedToday.splice(itemIndex, 1);
-    
     showToast(t().undoSuccess);
     saveState();
     render();
@@ -511,7 +498,6 @@ const renderShoppingTab = (container: any, trans: any) => {
         return;
     }
 
-    // Section for Items to Buy
     if (toBuy.length > 0) {
         const buyBox = document.createElement('div');
         buyBox.className = 'bg-white rounded-[3rem] shadow-sm divide-y divide-[#3D2B1F]/5 overflow-hidden border border-[#3D2B1F]/5';
@@ -543,7 +529,6 @@ const renderShoppingTab = (container: any, trans: any) => {
         shopList.appendChild(buyBox);
     }
 
-    // Section for Fully Stocked
     if (stocked.length > 0) {
         const stockedHeader = document.createElement('h3');
         stockedHeader.className = 'text-xs font-black uppercase tracking-widest text-[#3D2B1F]/40 px-4 mb-[-1rem]';
@@ -583,8 +568,6 @@ const renderShoppingTab = (container: any, trans: any) => {
 
 const calculateSmartAggregated = () => {
     const totals: any = {};
-    
-    // Sum from orders
     Object.entries(state.orders).forEach(([id, qty]) => {
         const r = state.recipes.find((rcp: any) => String(rcp.id) === String(id));
         if (!r || (qty as number) <= 0) return;
@@ -593,16 +576,11 @@ const calculateSmartAggregated = () => {
             if (totals[key]) {
                 totals[key].totalNeeded += ing.quantity * (qty as number);
             } else {
-                totals[key] = { 
-                    name: ing.name.trim(), 
-                    totalNeeded: ing.quantity * (qty as number), 
-                    unit: ing.unit 
-                };
+                totals[key] = { name: ing.name.trim(), totalNeeded: ing.quantity * (qty as number), unit: ing.unit };
             }
         });
     });
 
-    // Deduct from inventory
     return Object.values(totals).map((item: any) => {
         const inventoryItem = state.inventory.find((inv: any) => 
             inv.name.toLowerCase().trim() === item.name.toLowerCase().trim() && 
@@ -610,11 +588,7 @@ const calculateSmartAggregated = () => {
         );
         const inPantry = inventoryItem ? inventoryItem.quantity : 0;
         const netToBuy = Math.max(0, item.totalNeeded - inPantry);
-        return {
-            ...item,
-            inPantry,
-            netToBuy
-        };
+        return { ...item, inPantry, netToBuy };
     });
 };
 
@@ -687,7 +661,127 @@ const renderModalIngs = () => {
     (window as any).lucide.createIcons();
 };
 
-// --- AI (Photo & Voice) ---
+// --- AI (Photo & Voice & Magic Paste) ---
+const handleMagicPaste = async () => {
+    const text = (document.getElementById('magicPasteArea') as any).value;
+    if (!text.trim()) return;
+    
+    document.getElementById('aiScanningOverlay')!.classList.remove('hidden');
+    (document.getElementById('aiScanningText') as any).textContent = t().aiScanning;
+    
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: { parts: [{ text: `TASK: Extract the following recipe text into a structured JSON object. 
+            Identify the recipe name and all ingredients with their quantities and units.
+            Normalize units to: grams, kg, units, liters, cans, packs. 
+            If the text is in Hebrew, translate the values to English.
+            RECIPE TEXT: ${text}` }] },
+            config: { 
+                responseMimeType: "application/json", 
+                responseSchema: { 
+                    type: Type.OBJECT, 
+                    properties: { 
+                        name: { type: Type.STRING }, 
+                        ingredients: { 
+                            type: Type.ARRAY, 
+                            items: { 
+                                type: Type.OBJECT, 
+                                properties: { 
+                                    name: { type: Type.STRING }, 
+                                    quantity: { type: Type.NUMBER }, 
+                                    unit: { type: Type.STRING } 
+                                },
+                                required: ["name", "quantity", "unit"]
+                            } 
+                        } 
+                    },
+                    required: ["name", "ingredients"]
+                } 
+            }
+        });
+        
+        const res = JSON.parse(response.text.trim());
+        // Add required client-side IDs
+        res.ingredients = res.ingredients.map((ing: any) => ({
+            ...ing,
+            id: Date.now().toString() + Math.random(),
+            unit: (UNIT_OPTIONS.includes(ing.unit?.toLowerCase()) ? ing.unit.toLowerCase() : 'kg')
+        }));
+
+        document.getElementById('magicPasteModal')!.classList.remove('open');
+        openRecipeModal(null, res);
+    } catch (e) { 
+        console.error(e);
+        alert(t().aiScanError); 
+    } finally { 
+        document.getElementById('aiScanningOverlay')!.classList.add('hidden'); 
+    }
+};
+
+const handlePhotoScan = async (base64Image: string) => {
+    document.getElementById('aiScanningOverlay')!.classList.remove('hidden');
+    (document.getElementById('aiScanningText') as any).textContent = t().aiScanning;
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const parts = base64Image.split(',');
+    const mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const data = parts[1];
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: { 
+                parts: [
+                    { inlineData: { mimeType, data } },
+                    { text: `TASK: Extract the recipe from this image. Identify the name and ingredients. Normalize units. Translate to ${state.lang === 'he' ? 'Hebrew' : 'English'}.` }
+                ] 
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        name: { type: Type.STRING },
+                        ingredients: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    name: { type: Type.STRING },
+                                    quantity: { type: Type.NUMBER },
+                                    unit: { type: Type.STRING }
+                                },
+                                required: ["name", "quantity", "unit"]
+                            }
+                        }
+                    },
+                    required: ["name", "ingredients"]
+                }
+            }
+        });
+
+        const res = JSON.parse(response.text.trim());
+        res.ingredients = res.ingredients.map((ing: any) => ({
+            ...ing,
+            id: Date.now().toString() + Math.random(),
+            unit: (UNIT_OPTIONS.includes(ing.unit?.toLowerCase()) ? ing.unit.toLowerCase() : 'kg')
+        }));
+        
+        // Directly update modal fields
+        (document.getElementById('recipeNameInput') as any).value = res.name;
+        state.modalIngredients = res.ingredients;
+        renderModalIngs();
+        
+    } catch (error) {
+        console.error(error);
+        alert(t().aiScanError);
+    } finally {
+        document.getElementById('aiScanningOverlay')!.classList.add('hidden');
+    }
+};
+
 const startVoice = async () => {
     if (state.isVoiceActive) { stopVoice(); return; }
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -767,8 +861,18 @@ document.getElementById('langToggle')!.onclick = () => { state.lang = state.lang
 });
 
 document.getElementById('closeModalBtn')!.onclick = () => { stopVoice(); document.getElementById('recipeModal')!.classList.remove('open'); };
-document.getElementById('addIngredientBtn')!.onclick = () => { state.modalIngredients.push({ id: Date.now().toString(), name: '', quantity: 1, unit: 'kg' }); renderModalIngs(); };
+document.getElementById('addIngredientBtn')!.onclick = () => { state.modalIngredients.push({ id: Date.now().toString() + Math.random(), name: '', quantity: 1, unit: 'kg' }); renderModalIngs(); };
 document.getElementById('voiceAssistantBtn')!.onclick = startVoice;
+document.getElementById('runMagicPasteBtn')!.onclick = handleMagicPaste;
+
+document.getElementById('aiScanBtn')!.onclick = () => document.getElementById('aiFileInput')!.click();
+document.getElementById('aiFileInput')!.onchange = (e: any) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => handlePhotoScan(reader.result as string);
+    reader.readAsDataURL(file);
+};
 
 document.getElementById('recipeForm')!.onsubmit = (e) => {
     e.preventDefault();
@@ -810,24 +914,6 @@ document.getElementById('magicPasteBtn')!.onclick = () => {
     document.getElementById('magicPasteModal')!.classList.add('open');
 };
 document.getElementById('closeMagicPasteBtn')!.onclick = () => document.getElementById('magicPasteModal')!.classList.remove('open');
-document.getElementById('runMagicPasteBtn')!.onclick = async () => {
-    const text = (document.getElementById('magicPasteArea') as any).value;
-    if (!text.trim()) return;
-    document.getElementById('aiScanningOverlay')!.classList.remove('hidden');
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: `Extract this recipe to JSON. TEXT: ${text}`,
-            config: { responseMimeType: "application/json", responseSchema: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, ingredients: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, quantity: { type: Type.NUMBER }, unit: { type: Type.STRING } } } } } } }
-        });
-        const res = JSON.parse(response.text.trim());
-        document.getElementById('magicPasteModal')!.classList.remove('open');
-        openRecipeModal(null, res);
-    } catch (e) { alert('AI failed'); }
-    finally { document.getElementById('aiScanningOverlay')!.classList.add('hidden'); }
-};
-
 document.getElementById('closeImportMenu')!.onclick = () => document.getElementById('importMenu')!.classList.remove('open');
 
 render();
