@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Recipe, Order, Language, Ingredient, Unit } from './types.ts';
-import { TRANSLATIONS, CATEGORY_OPTIONS, UNIT_OPTIONS } from './constants.tsx';
+import { TRANSLATIONS, CATEGORY_OPTIONS, UNIT_OPTIONS, LOGO_DATA_URL } from './constants.tsx';
 import { 
   BookOpen, 
   ShoppingCart, 
@@ -386,7 +387,7 @@ const App: React.FC = () => {
 
       <header className="sticky top-0 z-40 bg-[#FEF9F3]/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-[#3D2B1F]/5">
         <div className="flex items-center gap-3">
-            <img src="logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-sm" />
+            <img src={LOGO_DATA_URL} alt="Logo" className="w-10 h-10 rounded-xl shadow-sm" />
             <h1 className="text-xl font-bold tracking-tight">{t.title}</h1>
         </div>
         <button onClick={() => setLang(lang === 'en' ? 'he' : 'en')} className="bg-white shadow-sm border border-[#3D2B1F]/10 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-bold active:scale-95 transition-transform">

@@ -1,4 +1,6 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { LOGO_DATA_URL } from "./constants.tsx";
 
 const TRANSLATIONS: any = {
     en: {
@@ -173,6 +175,13 @@ const render = () => {
     document.body.dir = state.lang === 'he' ? 'rtl' : 'ltr';
     (document.getElementById('appTitle') as any).textContent = trans.title;
     (document.getElementById('langToggleLabel') as any).textContent = state.lang === 'en' ? '🇮🇱 HE' : '🇺🇸 EN';
+
+    // Ensure logo is set properly in index.html (it's already handled by hardcoded src but we update the container just in case)
+    const titleContainer = document.getElementById('appTitleContainer');
+    if (titleContainer) {
+        const logoImg = titleContainer.querySelector('img');
+        if (logoImg) logoImg.src = LOGO_DATA_URL;
+    }
 
     ['recipes', 'orders', 'inventory', 'shopping'].forEach(id => {
         const btn = document.getElementById(`nav-${id}`) as any;
