@@ -1,4 +1,3 @@
-
 import { Translation } from './types.ts';
 
 export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
@@ -6,6 +5,7 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     title: 'The Smart Pantry',
     recipes: 'Recipes',
     orders: 'Orders',
+    inventory: 'Inventory',
     shopping: 'Shopping',
     addRecipe: 'Add Recipe',
     recipeName: 'Recipe Name',
@@ -22,7 +22,8 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     copyWhatsapp: 'Copy to WhatsApp',
     emptyRecipes: 'No recipes yet. Tap + to add one!',
     emptyOrders: 'Set quantities for your daily orders.',
-    addIngredient: 'Add Ingredient',
+    emptyInventory: 'Your pantry is empty. Add items you have in stock.',
+    addIngredient: 'Add Item',
     recipeImage: 'Recipe Image',
     tapToUpload: 'Tap to upload photo',
     sortIngredients: 'Sort A-Z',
@@ -35,6 +36,14 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     prepTime: 'Prep Time',
     cookTime: 'Cook Time',
     minutes: 'min',
+    need: 'Need',
+    inPantry: 'in pantry',
+    fullyStocked: 'Fully Stocked / From Pantry',
+    planningMode: 'Planning',
+    cookingMode: 'Cooking',
+    markAsCooked: 'Done!',
+    ingredientsDeducted: 'Ingredients removed from pantry',
+    completedToday: 'Finished Today',
     categories: {
       meat: 'Meat',
       dairy: 'Dairy',
@@ -43,10 +52,10 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
       other: 'Other'
     },
     units: {
-      grams: 'grams',
       kg: 'kg',
+      grams: 'g',
       units: 'units',
-      liters: 'liters',
+      liters: 'L',
       cans: 'cans',
       packs: 'packs'
     }
@@ -55,6 +64,7 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     title: 'המזווה החכם',
     recipes: 'מתכונים',
     orders: 'הזמנות',
+    inventory: 'מלאי',
     shopping: 'קניות',
     addRecipe: 'הוסף מתכון',
     recipeName: 'שם המתכון',
@@ -64,14 +74,15 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     save: 'שמור שינויים',
     cancel: 'ביטול',
     delete: 'מחק',
-    edit: 'ערוך',
+    edit: 'עריכה',
     calculate: 'חשב רשימה',
     totalItems: 'סה"כ פריטים',
     exportCsv: 'ייצא לגוגל שיטס',
     copyWhatsapp: 'העתק לוואטסאפ',
     emptyRecipes: 'אין מתכונים עדיין. לחץ על + להוספה!',
     emptyOrders: 'קבע כמויות להזמנות היומיות שלך.',
-    addIngredient: 'הוסף מרכיב',
+    emptyInventory: 'המלאי שלך ריק. הוסף מוצרים שיש לך בבית.',
+    addIngredient: 'הוסף פריט',
     recipeImage: 'תמונת המנה',
     tapToUpload: 'לחץ להעלאת תמונה',
     sortIngredients: 'מיין א-ב',
@@ -84,6 +95,14 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
     prepTime: 'זמן הכנה',
     cookTime: 'זמן בישול',
     minutes: 'דקות',
+    need: 'צריך',
+    inPantry: 'במלאי',
+    fullyStocked: 'קיים במלאי / לא דרוש קנייה',
+    planningMode: 'תכנון',
+    cookingMode: 'בישול',
+    markAsCooked: 'בוצע!',
+    ingredientsDeducted: 'המרכיבים הופחתו מהמלאי',
+    completedToday: 'הוכנו היום',
     categories: {
       meat: 'בשרי',
       dairy: 'חלבי',
@@ -92,8 +111,8 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
       other: 'אחר'
     },
     units: {
-      grams: 'גרם',
       kg: 'ק"ג',
+      grams: 'גרם',
       units: 'יחידות',
       liters: 'ליטר',
       cans: 'קופסאות',
@@ -102,5 +121,5 @@ export const TRANSLATIONS: Record<'en' | 'he', Translation> = {
   }
 };
 
-export const UNIT_OPTIONS: string[] = ['grams', 'kg', 'units', 'liters', 'cans', 'packs'];
+export const UNIT_OPTIONS: string[] = ['kg', 'grams', 'units', 'liters', 'cans', 'packs'];
 export const CATEGORY_OPTIONS = ['meat', 'dairy', 'pareve', 'dessert', 'other'] as const;

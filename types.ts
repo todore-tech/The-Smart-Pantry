@@ -28,6 +28,7 @@ export interface Translation {
   title: string;
   recipes: string;
   orders: string;
+  inventory: string;
   shopping: string;
   addRecipe: string;
   recipeName: string;
@@ -44,6 +45,7 @@ export interface Translation {
   copyWhatsapp: string;
   emptyRecipes: string;
   emptyOrders: string;
+  emptyInventory: string;
   addIngredient: string;
   recipeImage: string;
   tapToUpload: string;
@@ -57,6 +59,14 @@ export interface Translation {
   prepTime: string;
   cookTime: string;
   minutes: string;
+  need: string;
+  inPantry: string;
+  fullyStocked: string;
+  planningMode: string;
+  cookingMode: string;
+  markAsCooked: string;
+  ingredientsDeducted: string;
+  completedToday: string;
   categories: {
     meat: string;
     dairy: string;
