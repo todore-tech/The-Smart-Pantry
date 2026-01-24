@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Smart Pantry</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -87,7 +89,10 @@
 <body class="min-h-screen flex flex-col">
     <div id="app-root" class="flex flex-col min-h-screen pb-32">
         <header class="sticky top-0 z-40 bg-[#FEF9F3]/90 backdrop-blur-xl px-6 py-4 flex justify-between items-center border-b border-[#3D2B1F]/5">
-            <h1 id="appTitle" class="text-xl font-black tracking-tight text-[#3D2B1F]">The Smart Pantry</h1>
+            <div id="appTitleContainer" class="flex items-center gap-3">
+                <img src="logo.png" alt="Logo" class="w-10 h-10 rounded-xl shadow-sm">
+                <h1 id="appTitle" class="text-xl font-black tracking-tight text-[#3D2B1F]">The Smart Pantry</h1>
+            </div>
             <button id="langToggle" class="bg-white shadow-sm border border-[#3D2B1F]/10 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-bold active:scale-95 transition-transform">
                 <i data-lucide="globe" class="text-[#FF8A3D] w-4 h-4"></i>
                 <span id="langToggleLabel">🇮🇱 HE</span>
@@ -156,7 +161,7 @@
             </button>
             <div class="pt-4 border-t border-[#3D2B1F]/5">
                 <button id="clearAllRecipesBtn" class="w-full flex items-center gap-4 p-5 rounded-3xl bg-red-50 text-red-500 border border-red-100 active:scale-95 transition-all text-left">
-                    <div class="p-3 bg-white rounded-2xl shadow-sm"><i data-lucide="trash-2"></i></div>
+                    <div class="p-3 bg-white rounded-2xl shadow-sm"><i data-lucide="trash-2" class="w-4 h-4"></i></div>
                     <div>
                         <div id="clearAllLabel" class="font-black text-sm">Clear Library</div>
                         <div id="clearAllSub" class="text-[10px] opacity-60 uppercase font-bold">Delete all recipes</div>

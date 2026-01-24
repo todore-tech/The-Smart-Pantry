@@ -385,7 +385,10 @@ const App: React.FC = () => {
       )}
 
       <header className="sticky top-0 z-40 bg-[#FEF9F3]/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-[#3D2B1F]/5">
-        <h1 className="text-xl font-bold tracking-tight">{t.title}</h1>
+        <div className="flex items-center gap-3">
+            <img src="logo.png" alt="Logo" className="w-10 h-10 rounded-xl shadow-sm" />
+            <h1 className="text-xl font-bold tracking-tight">{t.title}</h1>
+        </div>
         <button onClick={() => setLang(lang === 'en' ? 'he' : 'en')} className="bg-white shadow-sm border border-[#3D2B1F]/10 rounded-full px-4 py-2 flex items-center gap-2 text-sm font-bold active:scale-95 transition-transform">
           <Globe size={18} className="text-[#FF8A3D]" /> {lang === 'en' ? '🇮🇱 HE' : '🇺🇸 EN'}
         </button>
