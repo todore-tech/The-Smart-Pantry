@@ -28,7 +28,9 @@ const TRANSLATIONS: any = {
         voiceAssistant: 'Voice Assistant',
         voiceActive: 'Listening...',
         aiScanning: 'Scanning...',
-        aiScanError: 'AI Scan failed. Please check your API key selection.',
+        aiScanError: 'AI Scan failed. Please select a valid API key.',
+        connectApi: 'Connect API',
+        apiConnected: 'API Active',
         importMenuTitle: 'Import Methods',
         magicPasteLabel: 'Magic Paste AI',
         magicPasteSub: 'Paste any text recipe',
@@ -80,7 +82,9 @@ const TRANSLATIONS: any = {
         voiceAssistant: 'עוזר קולי',
         voiceActive: 'מקשיב...',
         aiScanning: 'סורק...',
-        aiScanError: 'סריקת ה-AI נכשלה. אנא בדוק את בחירת מפתח ה-API.',
+        aiScanError: 'סריקת ה-AI נכשלה. אנא בחר מפתח API תקין.',
+        connectApi: 'חבר API',
+        apiConnected: 'API פעיל',
         importMenuTitle: 'שיטות ייבוא',
         magicPasteLabel: 'הדבקת קסם AI',
         magicPasteSub: 'הדבק טקסט חופשי',
@@ -144,26 +148,43 @@ const saveState = () => {
 
 const t = () => TRANSLATIONS[state.lang];
 
-// --- API Key Helpers ---
+// --- API Key UI Helpers ---
+const updateApiKeyStatus = async () => {
+    const apiBtn = document.getElementById('apiKeyStatusBtn');
+    if (!apiBtn) return;
+
+    const hasKey = process.env.API_KEY && process.env.API_KEY !== 'null' && process.env.API_KEY !== 'undefined';
+
+    if (hasKey) {
+        apiBtn.classList.remove('bg-[#FF8A3D]', 'api-pulse');
+        apiBtn.classList.add('bg-green-50', 'text-green-600', 'border', 'border-green-200');
+        apiBtn.innerHTML = `<i data-lucide="shield-check" class="w-3 h-3"></i> <span>${t().apiConnected}</span>`;
+    } else {
+        apiBtn.classList.add('bg-[#FF8A3D]', 'text-white', 'api-pulse');
+        apiBtn.classList.remove('bg-green-50', 'text-green-600', 'border', 'border-green-200');
+        apiBtn.innerHTML = `<i data-lucide="key" class="w-3 h-3"></i> <span>${t().connectApi}</span>`;
+    }
+    (window as any).lucide.createIcons();
+};
+
 const ensureApiKey = async () => {
-    if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (!hasKey) {
+    const hasKey = process.env.API_KEY && process.env.API_KEY !== 'null' && process.env.API_KEY !== 'undefined';
+    if (!hasKey) {
+        if (window.aistudio) {
             await window.aistudio.openSelectKey();
-            // Proceed assuming selection was successful or handled
+        } else {
+            alert("No API Key detected. Please ensure you are running in an environment that provides a Google GenAI key.");
         }
     }
 };
 
 const handleAiError = async (err: any) => {
     console.error("AI Error:", err);
-    if (err.message?.includes("Requested entity was not found") || err.message?.includes("API Key must be set")) {
-        if (window.aistudio) {
-            alert("API Key not found or invalid. Please select a valid key from a paid project.");
-            await window.aistudio.openSelectKey();
-        }
-    } else {
+    if (err.message?.includes("API Key must be set") || err.message?.includes("entity was not found")) {
         alert(t().aiScanError);
+        if (window.aistudio) await window.aistudio.openSelectKey();
+    } else {
+        alert(t().aiScanError + " (" + (err.message || "Unknown error") + ")");
     }
 };
 
@@ -227,6 +248,7 @@ const render = () => {
     else if (state.activeTab === 'inventory') renderInventoryTab(main, trans);
     else if (state.activeTab === 'shopping') renderShoppingTab(main, trans);
 
+    updateApiKeyStatus();
     (window as any).lucide.createIcons();
 };
 
@@ -690,6 +712,8 @@ const handleMagicPaste = async () => {
     if (!text.trim()) return;
     
     await ensureApiKey();
+    if (!process.env.API_KEY || process.env.API_KEY === 'undefined') return;
+
     document.getElementById('aiScanningOverlay')!.classList.remove('hidden');
     (document.getElementById('aiScanningText') as any).textContent = t().aiScanning;
     
@@ -744,6 +768,8 @@ const handleMagicPaste = async () => {
 
 const handlePhotoScan = async (base64Image: string) => {
     await ensureApiKey();
+    if (!process.env.API_KEY || process.env.API_KEY === 'undefined') return;
+
     document.getElementById('aiScanningOverlay')!.classList.remove('hidden');
     (document.getElementById('aiScanningText') as any).textContent = t().aiScanning;
 
@@ -807,6 +833,8 @@ const startVoice = async () => {
     if (state.isVoiceActive) { stopVoice(); return; }
     
     await ensureApiKey();
+    if (!process.env.API_KEY || process.env.API_KEY === 'undefined') return;
+
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     state.isVoiceActive = true;
     state.inputAudioContext = new AudioContext({ sampleRate: 16000 });
@@ -891,6 +919,11 @@ document.getElementById('closeModalBtn')!.onclick = () => { stopVoice(); documen
 document.getElementById('addIngredientBtn')!.onclick = () => { state.modalIngredients.push({ id: Date.now().toString() + Math.random(), name: '', quantity: 1, unit: 'kg' }); renderModalIngs(); };
 document.getElementById('voiceAssistantBtn')!.onclick = startVoice;
 document.getElementById('runMagicPasteBtn')!.onclick = handleMagicPaste;
+
+document.getElementById('apiKeyStatusBtn')!.onclick = async () => {
+    if (window.aistudio) await window.aistudio.openSelectKey();
+    setTimeout(updateApiKeyStatus, 1500);
+};
 
 document.getElementById('aiScanBtn')!.onclick = () => document.getElementById('aiFileInput')!.click();
 document.getElementById('aiFileInput')!.onchange = (e: any) => {
