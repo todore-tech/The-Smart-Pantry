@@ -28,7 +28,7 @@ const TRANSLATIONS: any = {
         voiceAssistant: 'Voice Assistant',
         voiceActive: 'Listening...',
         aiScanning: 'Scanning...',
-        aiScanError: 'AI Scan failed.',
+        aiScanError: 'AI Scan failed. Please check your API key selection.',
         importMenuTitle: 'Import Methods',
         magicPasteLabel: 'Magic Paste AI',
         magicPasteSub: 'Paste any text recipe',
@@ -80,7 +80,7 @@ const TRANSLATIONS: any = {
         voiceAssistant: 'עוזר קולי',
         voiceActive: 'מקשיב...',
         aiScanning: 'סורק...',
-        aiScanError: 'סריקת ה-AI נכשלה.',
+        aiScanError: 'סריקת ה-AI נכשלה. אנא בדוק את בחירת מפתח ה-API.',
         importMenuTitle: 'שיטות ייבוא',
         magicPasteLabel: 'הדבקת קסם AI',
         magicPasteSub: 'הדבק טקסט חופשי',
@@ -143,6 +143,29 @@ const saveState = () => {
 };
 
 const t = () => TRANSLATIONS[state.lang];
+
+// --- API Key Helpers ---
+const ensureApiKey = async () => {
+    if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+            await window.aistudio.openSelectKey();
+            // Proceed assuming selection was successful or handled
+        }
+    }
+};
+
+const handleAiError = async (err: any) => {
+    console.error("AI Error:", err);
+    if (err.message?.includes("Requested entity was not found") || err.message?.includes("API Key must be set")) {
+        if (window.aistudio) {
+            alert("API Key not found or invalid. Please select a valid key from a paid project.");
+            await window.aistudio.openSelectKey();
+        }
+    } else {
+        alert(t().aiScanError);
+    }
+};
 
 // --- Audio ---
 function encode(bytes: any) {
@@ -666,11 +689,12 @@ const handleMagicPaste = async () => {
     const text = (document.getElementById('magicPasteArea') as any).value;
     if (!text.trim()) return;
     
+    await ensureApiKey();
     document.getElementById('aiScanningOverlay')!.classList.remove('hidden');
     (document.getElementById('aiScanningText') as any).textContent = t().aiScanning;
     
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: { parts: [{ text: `TASK: Extract the following recipe text into a structured JSON object. 
@@ -703,7 +727,6 @@ const handleMagicPaste = async () => {
         });
         
         const res = JSON.parse(response.text.trim());
-        // Add required client-side IDs
         res.ingredients = res.ingredients.map((ing: any) => ({
             ...ing,
             id: Date.now().toString() + Math.random(),
@@ -713,23 +736,23 @@ const handleMagicPaste = async () => {
         document.getElementById('magicPasteModal')!.classList.remove('open');
         openRecipeModal(null, res);
     } catch (e) { 
-        console.error(e);
-        alert(t().aiScanError); 
+        await handleAiError(e);
     } finally { 
         document.getElementById('aiScanningOverlay')!.classList.add('hidden'); 
     }
 };
 
 const handlePhotoScan = async (base64Image: string) => {
+    await ensureApiKey();
     document.getElementById('aiScanningOverlay')!.classList.remove('hidden');
     (document.getElementById('aiScanningText') as any).textContent = t().aiScanning;
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const parts = base64Image.split(',');
-    const mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-    const data = parts[1];
-
     try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const parts = base64Image.split(',');
+        const mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+        const data = parts[1];
+
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: { 
@@ -769,14 +792,12 @@ const handlePhotoScan = async (base64Image: string) => {
             unit: (UNIT_OPTIONS.includes(ing.unit?.toLowerCase()) ? ing.unit.toLowerCase() : 'kg')
         }));
         
-        // Directly update modal fields
         (document.getElementById('recipeNameInput') as any).value = res.name;
         state.modalIngredients = res.ingredients;
         renderModalIngs();
         
     } catch (error) {
-        console.error(error);
-        alert(t().aiScanError);
+        await handleAiError(error);
     } finally {
         document.getElementById('aiScanningOverlay')!.classList.add('hidden');
     }
@@ -784,6 +805,8 @@ const handlePhotoScan = async (base64Image: string) => {
 
 const startVoice = async () => {
     if (state.isVoiceActive) { stopVoice(); return; }
+    
+    await ensureApiKey();
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     state.isVoiceActive = true;
     state.inputAudioContext = new AudioContext({ sampleRate: 16000 });
@@ -832,13 +855,17 @@ const startVoice = async () => {
                     }
                 }
             },
+            onerror: async (e: any) => {
+                await handleAiError(e);
+                stopVoice();
+            },
             onclose: () => stopVoice()
         },
         config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } } },
             tools: [{ functionDeclarations: [{ name: 'update_recipe_fields', parameters: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, ingredients: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, quantity: { type: Type.NUMBER }, unit: { type: Type.STRING } } } } } } }] }],
-            systemInstruction: `You are a helpful kitchen assistant. Help the user fill out the recipe form. Use update_recipe_fields tool.`
+            systemInstruction: `You are a helpful kitchen assistant. Help the user fill out the recipe form. Use update_recipe_fields tool. Refer users to ai.google.dev/gemini-api/docs/billing if they have key issues.`
         }
     });
     state.voiceSession = sessionPromise;

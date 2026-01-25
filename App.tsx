@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Recipe, Order, Language, Ingredient, Unit } from './types.ts';
 import { TRANSLATIONS, CATEGORY_OPTIONS, UNIT_OPTIONS, LOGO_DATA_URL } from './constants.tsx';
@@ -372,7 +371,8 @@ const App: React.FC = () => {
     return Object.entries(orders).flatMap(([id, qty]) => {
       const r = recipes.find(rcp => String(rcp.id) === String(id));
       if (!r || !qty) return [];
-      return Array.from({ length: qty }).map((_, idx) => ({ id, r, batchIndex: idx }));
+      // Explicitly cast qty to number to fix 'unknown' type inference from Object.entries on a string-indexed object
+      return Array.from({ length: qty as number }).map((_, idx) => ({ id, r, batchIndex: idx }));
     });
   }, [orders, recipes]);
 
